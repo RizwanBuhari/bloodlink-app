@@ -19,8 +19,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String? _selectedBloodGroup; // For storing the selected dropdown value
   final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
+  final List<String> _emirates = [
+    'Abu Dhabi',
+    'Dubai',
+    'Sharjah',
+    'Umm Al Quwain',
+    'Fujairah',
+    'Ajman',
+    'Ras Al Khaimah',
+  ];
+  String? _selectedEmirate;
+
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -32,7 +42,6 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _nameController.dispose();
 
     _phoneController.dispose();
-    _locationController.dispose();
     //_bloodGroupController.dispose();
     super.dispose();
   }
@@ -182,23 +191,31 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
               const SizedBox(height: 30),
 
-              TextFormField(
-                controller: _locationController, // Use the controller declared in Step 12.1
+              DropdownButtonFormField<String>(
                 decoration: InputDecoration(
-                  labelText: 'Location (e.g., City, State)',
-                  hintText: 'Enter your city and state',
-                  prefixIcon: Icon(Icons.location_city),
+                  labelText: 'Emirate',
+                  prefixIcon: Icon(Icons.location_city), // Keeping a similar icon
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.0),
                   ),
                 ),
-                keyboardType: TextInputType.text,
+                value: _selectedEmirate,
+                hint: const Text('Select your Emirate'),
+                isExpanded: true,
+                items: _emirates.map((String emirate) {
+                  return DropdownMenuItem<String>(
+                    value: emirate,
+                    child: Text(emirate),
+                  );
+                }).toList(),
+                onChanged: (String? newValue) {
+                  setState(() {
+                    _selectedEmirate = newValue;
+                  });
+                },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your location'; // Making location mandatory for this example
-                  }
-                  if (value.length < 3) {
-                    return 'Please enter a more specific location';
+                    return 'Please select your Emirate';
                   }
                   return null;
                 },
@@ -243,19 +260,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
                       if (newUser != null) { // Ensure user is not null
                         String phoneNumber = _phoneController.text.trim();
-                        String location = _locationController.text.trim();
+
                         await _firestore.collection('users').doc(newUser.uid).set({
                           'uid': newUser.uid,
                           'name': _nameController.text.trim(),
                           'email': newUser.email, // Store email for convenience
                           'bloodGroup': _selectedBloodGroup,
                           'phoneNumber': phoneNumber.isNotEmpty ? phoneNumber : '', // Store empty string if not provided
-                          'location': location,
+                          'emirate': _selectedEmirate,
                           'createdAt': Timestamp.now(), // Good practice to store creation time
                         });
 
-                        print('User data saved to Firestore with phone and location for UID: ${newUser.uid}');                      } else {
-                        // Handle case where user is null after creation (should be rare)
+                        print('User data saved to Firestore with phone and emirate for UID: ${newUser.uid}');                        // Handle case where user is null after creation (should be rare)
                         print('User object was null after creation.');
                         // You might want to show an error message to the user here
                         // and potentially prevent further execution or navigation.
