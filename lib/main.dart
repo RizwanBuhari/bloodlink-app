@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // Add this line
-import 'firebase_options.dart';                   // Add this line
-import 'screens/registration_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'screens/login_screen.dart'; // Adjust path if your screens are elsewhere
 import 'screens/home_screen.dart';
-import 'package:flutterprojects/screens/login_screen.dart';
-
+import 'screens/login_screen.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Add this line
-  await Firebase.initializeApp(                // Add this line
-    options: DefaultFirebaseOptions.currentPlatform, // Add this line
-  );                                           // Add this line
+
+  WidgetsFlutterBinding.ensureInitialized();
+  print("--- main: WidgetsFlutterBinding.ensureInitialized() called ---");
+
+  print("--- main: Firebase.initializeApp starting ---");
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print("--- main: Firebase.initializeApp completed SUCCESSFULLY ---");
+  } catch (e) {
+    print("--- main: Firebase.initializeApp FAILED: $e ---");
+
+  }
+
+
+  print("--- main: runApp(const MyApp()) called ---");
   runApp(const MyApp());
 }
 
@@ -21,81 +31,83 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print("--- MyApp build method CALLED ---");
     return MaterialApp(
-      title: 'Flutter Firebase App', // You can change the title
+      title: 'Blood Donation App', // Or your preferred app title
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.red[700] ?? Colors.red), // Using your app's theme color
         useMaterial3: true,
+        // You can add more theme customizations here
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.red[700] ?? Colors.red, // Consistent AppBar color
+          foregroundColor: Colors.white, // Text/icon color on AppBar
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red[600] ?? Colors.redAccent, // Button background
+            foregroundColor: Colors.white, // Button text/icon color
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+        ),
       ),
-      debugShowCheckedModeBanner: false, // Optional: hides the debug banner
+      debugShowCheckedModeBanner: false, // Hides the debug banner
 
-      // VVVV THIS IS THE MAIN CHANGE VVVV
+      // StreamBuilder to handle authentication state
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (BuildContext context, AsyncSnapshot<User?> snapshot) {
-          // Show a loading indicator while checking auth state (good practice)
+          // VITAL DEBUG PRINT for StreamBuilder
+          print(
+              "--- StreamBuilder REBUILT --- ConnectionState: ${snapshot.connectionState}, HasError: ${snapshot.hasError}, Error: ${snapshot.error}, HasData: ${snapshot.hasData}, User ID: ${snapshot.data?.uid}, User Email: ${snapshot.data?.email}");
+
+          // 1. Handle connection state (while waiting for the first auth event)
           if (snapshot.connectionState == ConnectionState.waiting) {
+            print("--- StreamBuilder: State is WAITING (initial auth check) ---");
             return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 10),
+                    Text("Connecting..."),
+                  ],
+                ),
+              ),
             );
           }
 
-          // After connection state is resolved:
+          // 2. Handle errors in the auth stream itself
+          if (snapshot.hasError) {
+            print("--- StreamBuilder: Snapshot HAS ERROR: ${snapshot.error} ---");
+            // You might want to show a more user-friendly error screen here
+            return Scaffold(
+              body: Center(
+                child: Text(
+                  "Error in authentication stream: ${snapshot.error}\nPlease restart the app.",
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
+          // 3. After connection state is resolved and no stream error:
+          // Check if user data is present (logged in)
           if (snapshot.hasData && snapshot.data != null) {
-            // User is logged in (snapshot.data contains the User object)
+            print(
+                "--- StreamBuilder: User IS LOGGED IN (User ID: ${snapshot.data!.uid}) --- Navigating to HomeScreen ---");
             return const HomeScreen(); // Show HomeScreen
           } else {
-            // User is logged out (snapshot.data is null)
+            // User is logged out (snapshot.data is null or no data)
+            print(
+                "--- StreamBuilder: User IS LOGGED OUT or data is null --- Navigating to LoginScreen ---");
             return const LoginScreen(); // Show LoginScreen
           }
         },
       ),
-      // ^^^^ END OF MAIN CHANGE ^^^^
+
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}

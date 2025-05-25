@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 
 class CreateRequestScreen extends StatefulWidget {
   const CreateRequestScreen({super.key});
@@ -11,15 +12,25 @@ class CreateRequestScreen extends StatefulWidget {
 
 class _CreateRequestScreenState extends State<CreateRequestScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _patientDetailsController = TextEditingController();
-  final TextEditingController _contactPersonController = TextEditingController();
-  final TextEditingController _contactPhoneController = TextEditingController();
+  final TextEditingController _patientDetailsController =
+  TextEditingController();
+  final TextEditingController _contactPersonController =
+  TextEditingController();
+  final TextEditingController _contactPhoneController =
+  TextEditingController();
   final TextEditingController _notesController = TextEditingController();
 
   String? _selectedUrgency;
-  final List<String> _urgencyLevels = ['Urgent', 'Within 24 hours', 'Within 3 days', 'Flexible'];
+  final List<String> _urgencyLevels = [
+    'Urgent',
+    'Within 24 hours',
+    'Within 3 days',
+    'Flexible'
+  ];
   String? _selectedBloodGroup;
-  final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  final List<String> _bloodGroups = [
+    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'
+  ];
 
   bool _isLoading = false;
 
@@ -27,11 +38,15 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   final List<String> _emirates = const [
-    'Abu Dhabi', 'Dubai', 'Sharjah', 'Umm Al Quwain', 'Fujairah', 'Ajman', 'Ras Al Khaimah',
+    'Abu Dhabi', 'Dubai', 'Sharjah', 'Umm Al Quwain',
+    'Fujairah', 'Ajman', 'Ras Al Khaimah',
   ];
   String? _selectedRequestEmirate;
-  Map<String, dynamic>? _currentUserProfileData;
+  Map<String, dynamic>? _currentUserProfileData; // To store fetched user data
   bool _isLoadingUserData = true;
+
+  final String _countryCode = "+971";
+  bool _showPhoneNumberZeroHint = false;
 
   @override
   void initState() {
@@ -39,49 +54,50 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     _fetchCurrentUserProfileAndSetEmirate();
   }
 
+  // --- DEFINITION FOR _fetchCurrentUserProfileAndSetEmirate ---
   Future<void> _fetchCurrentUserProfileAndSetEmirate() async {
+    if (!mounted) return; // Check if the widget is still in the tree
+    setState(() {
+      _isLoadingUserData = true;
+    });
+
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
       try {
-        final DocumentSnapshot<Map<String, dynamic>> userDoc =
+        DocumentSnapshot userDoc =
         await _firestore.collection('users').doc(currentUser.uid).get();
-        if (mounted) {
-          if (userDoc.exists) {
-            _currentUserProfileData = userDoc.data();
-            if (_currentUserProfileData != null && _currentUserProfileData!['emirate'] != null) {
-              final String userEmirate = _currentUserProfileData!['emirate'] as String;
-              if (_emirates.contains(userEmirate)) {
-                setState(() {
-                  _selectedRequestEmirate = userEmirate;
-                });
-              }
+        if (userDoc.exists && userDoc.data() != null) {
+          _currentUserProfileData = userDoc.data() as Map<String, dynamic>;
+          // Assuming 'emirate' is the field name in your user profile document
+          // and it stores one of the strings from the _emirates list.
+          final String? defaultEmirate = _currentUserProfileData!['emirate'];
+          if (defaultEmirate != null && _emirates.contains(defaultEmirate)) {
+            if (mounted) { // Check mounted again before calling setState
+              setState(() {
+                _selectedRequestEmirate = defaultEmirate;
+              });
             }
-          } else {
-            print("User profile not found in Firestore for UID: ${currentUser.uid}");
           }
         }
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error fetching your profile: ${e.toString()}')),
-          );
-        }
-        print("Error fetching user profile for request form: $e");
+        // It's good practice to catch potential errors during async operations
+        print("Error fetching user profile for emirate prefill: $e");
+        // Optionally, you could show a SnackBar to the user
+        // if (mounted) {
+        //   ScaffoldMessenger.of(context).showSnackBar(
+        //     SnackBar(content: Text('Could not load your default emirate.')),
+        //   );
+        // }
       }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error: No user logged in.')),
-        );
-      }
-      print("No current user to fetch profile from for the request form.");
     }
-    if (mounted) {
+
+    if (mounted) { // Ensure widget is still mounted before final setState
       setState(() {
         _isLoadingUserData = false;
       });
     }
   }
+  // --- END OF _fetchCurrentUserProfileAndSetEmirate DEFINITION ---
 
   @override
   void dispose() {
@@ -93,6 +109,11 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   }
 
   Future<void> _submitRequest() async {
+    if (!mounted) return;
+    setState(() {
+      _showPhoneNumberZeroHint = false;
+    });
+
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -113,9 +134,19 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         return;
       }
       try {
+        String enteredDigits = _contactPhoneController.text.trim();
+        String fullContactPhoneNumber = _countryCode + enteredDigits;
+
+        // Attempt to get user's name from profile if Firebase display name is null
+        String requesterName = currentUser.displayName ?? _currentUserProfileData?['name'] ?? 'N/A';
+        if (requesterName == 'N/A' && _currentUserProfileData != null && _currentUserProfileData!['fullName'] != null) {
+          requesterName = _currentUserProfileData!['fullName']; // Or whatever your name field is in profiles
+        }
+
+
         Map<String, dynamic> requestData = {
           'requesterId': currentUser.uid,
-          'requesterName': currentUser.displayName ?? 'N/A',
+          'requesterName': requesterName,
           'requesterEmail': currentUser.email,
           'bloodGroup': _selectedBloodGroup,
           'location': _selectedRequestEmirate,
@@ -124,7 +155,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
               ? null
               : _patientDetailsController.text.trim(),
           'contactPerson': _contactPersonController.text.trim(),
-          'contactPhone': _contactPhoneController.text.trim(),
+          'contactPhone': fullContactPhoneNumber,
           'notes': _notesController.text.trim().isEmpty
               ? null
               : _notesController.text.trim(),
@@ -148,17 +179,20 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
           setState(() {
             _selectedUrgency = null;
             _selectedBloodGroup = null;
-            _selectedRequestEmirate = null; // Will be re-fetched by initState if user stays
-            // or if you call _fetchCurrentUserProfileAndSetEmirate() again.
-            // For now, null is fine.
+            // _selectedRequestEmirate will be reset if you call _fetchCurrentUserProfileAndSetEmirate() again
+            // or you can set it to null if that's the desired behavior after submission
+            // _selectedRequestEmirate = null; // Uncomment if you want to clear it fully
           });
+          // Optionally re-fetch to set default emirate again, or clear it
+          _fetchCurrentUserProfileAndSetEmirate(); // To reset to default or keep it based on fetched data
         }
       } catch (e) {
         print("Error submitting blood request: $e");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('Failed to submit request. Please try again. Error: ${e.toString()}'),
+                content: Text(
+                    'Failed to submit request. Please try again. Error: ${e.toString().substring(0, (e.toString().length > 100 ? 100 : e.toString().length))}...'), // Truncate long errors
                 backgroundColor: Colors.red),
           );
         }
@@ -170,10 +204,20 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
         }
       }
     } else {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+      // If validation fails, check phone hint condition
+      final currentPhoneText = _contactPhoneController.text;
+      if (currentPhoneText.isNotEmpty && currentPhoneText.startsWith('0')) {
+        if (!_showPhoneNumberZeroHint) {
+          setState(() {
+            _showPhoneNumberZeroHint = true;
+          });
+        }
+      } else {
+        if (_showPhoneNumberZeroHint) {
+          setState(() {
+            _showPhoneNumberZeroHint = false;
+          });
+        }
       }
     }
   }
@@ -184,6 +228,10 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
       appBar: AppBar(
         title: const Text('Create Blood Request'),
         backgroundColor: Colors.redAccent,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -194,9 +242,9 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             children: <Widget>[
               DropdownButtonFormField<String>(
                 value: _selectedBloodGroup,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Blood Group Needed',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
                   prefixIcon: Icon(Icons.bloodtype_outlined),
                 ),
                 hint: const Text('Select Blood Group'),
@@ -221,9 +269,8 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
               ),
               const SizedBox(height: 16.0),
 
-              // VVVV CORRECTED SECTION FOR EMIRATE DROPDOWN VVVV
               if (_isLoadingUserData)
-                Padding( // No semicolon here if it's part of collection-if
+                Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -237,13 +284,13 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                       Text("Loading user's Emirate..."),
                     ],
                   ),
-                ) // No semicolon here
+                )
               else
-                DropdownButtonFormField<String>( // No semicolon here
+                DropdownButtonFormField<String>(
                   value: _selectedRequestEmirate,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Emirate (for blood request)',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
                     prefixIcon: Icon(Icons.public_outlined),
                   ),
                   hint: const Text('Select Emirate'),
@@ -265,16 +312,14 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                     }
                     return null;
                   },
-                ), // <<< ADDED A COMMA HERE, as it's followed by SizedBox
-              // ^^^^ END OF CORRECTED SECTION ^^^^
-
-              const SizedBox(height: 16.0), // This was the line with "Expected to find ','"
+                ),
+              const SizedBox(height: 16.0),
 
               DropdownButtonFormField<String>(
                 value: _selectedUrgency,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Urgency Level',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
                   prefixIcon: Icon(Icons.priority_high_outlined),
                 ),
                 hint: const Text('Select Urgency'),
@@ -301,9 +346,9 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
 
               TextFormField(
                 controller: _patientDetailsController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Patient Name / Details (Optional)',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
                   prefixIcon: Icon(Icons.person_search_outlined),
                 ),
               ),
@@ -311,9 +356,9 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
 
               TextFormField(
                 controller: _contactPersonController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Contact Person Name',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
                   prefixIcon: Icon(Icons.account_circle_outlined),
                 ),
                 validator: (value) {
@@ -327,26 +372,65 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
 
               TextFormField(
                 controller: _contactPhoneController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Contact Phone Number',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone_outlined),
+                  hintText: '5X XXX XXXX (e.g., 501234567)',
+                  prefixText: "$_countryCode ",
+                  prefixStyle: const TextStyle(
+                      color: Colors.black, fontWeight: FontWeight.bold),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
                 ),
                 keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(9),
+                ],
+                onChanged: (value) {
+                  if (value.isNotEmpty && value.startsWith('0')) {
+                    if (!_showPhoneNumberZeroHint) {
+                      setState(() {
+                        _showPhoneNumberZeroHint = true;
+                      });
+                    }
+                  } else {
+                    if (_showPhoneNumberZeroHint) {
+                      setState(() {
+                        _showPhoneNumberZeroHint = false;
+                      });
+                    }
+                  }
+                },
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter the contact phone number';
                   }
+                  if (value.trim().length != 9) {
+                    return 'Phone number must be 9 digits';
+                  }
+                  if (value.trim().startsWith('0')) {
+                    return 'Number should not start with 0 (e.g., enter 50... not 050...)';
+                  }
                   return null;
                 },
               ),
+              if (_showPhoneNumberZeroHint)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+                  child: Text(
+                    'Do not start with 0 (e.g., $_countryCode 5xxxxxxxx)',
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontSize: 12.0,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 16.0),
 
               TextFormField(
                 controller: _notesController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Additional Notes (Optional)',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
                   prefixIcon: Icon(Icons.notes_outlined),
                 ),
                 maxLines: 3,
@@ -359,10 +443,13 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                 icon: const Icon(Icons.send_outlined),
                 label: const Text('Submit Request'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12.0),
-                  textStyle: const TextStyle(fontSize: 16.0),
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12.0),
+                    textStyle: const TextStyle(fontSize: 16.0),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.0)
+                    )
                 ),
                 onPressed: _submitRequest,
               ),

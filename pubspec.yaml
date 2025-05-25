@@ -37,6 +37,7 @@ dependencies:
   firebase_core: ^2.32.0
   firebase_auth: ^4.16.0
   cloud_firestore: ^4.15.8
+  url_launcher: ^6.2.6
 
 dev_dependencies:
   flutter_test:
@@ -48,6 +49,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: "^0.13.1"
+  flutter_native_splash: "^2.3.10" # Assuming this is the latest, or update as needed
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -61,9 +64,9 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    - assets/icon/ # Ensures your icon/splash image can be found
+    # - assets/images/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
@@ -90,3 +93,40 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Configuration for flutter_launcher_icons (App Icon)
+# This is at the root level (same indentation as name:, flutter:, etc.)
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
+  # Optional: For Android adaptive icons
+  # adaptive_icon_background: "#FFFFFF"
+  # adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+
+# Configuration for flutter_native_splash (Splash Screen)
+# This is also at the root level
+flutter_native_splash:
+  color: "#FFFFFF"  # Background color of your splash screen (white)
+  # Change to your app's primary or background color if needed
+  image: assets/icon/app_icon.png # Using your app icon as the splash image
+    # Change to a different image if you have one
+
+    # --- Optional Android 12+ specific theming ---
+    # If your main 'image' doesn't look right on Android 12+, you can customize it here.
+    # For now, it's commented out. The package will try to adapt your 'image'.
+    # android_12:
+    #   image: assets/icon/app_icon.png # Or a specific Android 12 icon
+    #   icon_background_color: "#FFFFFF"
+    # For dark mode on Android 12+
+    # image_dark: assets/icon/app_icon_dark.png
+    # color_dark: "#042a49" # Dark mode background
+  # icon_background_color_dark: "#042a49"
+
+  # --- Optional Gravity/Content Mode ---
+  # android_gravity: center # Default. Options like FIT_CENTER, CENTER_CROP, etc.
+  # ios_content_mode: scaleAspectFit # Default. Options: scaleAspectFill, center
+
+  # --- Optional Fullscreen ---
+  # fullscreen: true # Default is true. Set to false if you don't want fullscreen splash.

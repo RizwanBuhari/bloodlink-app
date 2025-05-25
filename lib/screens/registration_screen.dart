@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'home_screen.dart';
@@ -15,22 +16,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
-  //final TextEditingController _bloodGroupController = TextEditingController();
-  String? _selectedBloodGroup; // For storing the selected dropdown value
-  final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  String? _selectedBloodGroup;
+  final List<String> _bloodGroups = [
+    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'
+  ];
 
   final List<String> _emirates = [
-    'Abu Dhabi',
-    'Dubai',
-    'Sharjah',
-    'Umm Al Quwain',
-    'Fujairah',
-    'Ajman',
-    'Ras Al Khaimah',
+    'Abu Dhabi', 'Dubai', 'Sharjah', 'Umm Al Quwain',
+    'Fujairah', 'Ajman', 'Ras Al Khaimah',
   ];
   String? _selectedEmirate;
 
   final TextEditingController _phoneController = TextEditingController();
+  final String _countryCode = "+971";
+  bool _showPhoneNumberZeroHint = false; // <--- ADD THIS STATE VARIABLE
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -40,9 +39,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
-
     _phoneController.dispose();
-    //_bloodGroupController.dispose();
     super.dispose();
   }
 
@@ -53,15 +50,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         title: const Text('Register for BloodLink'),
         backgroundColor: Colors.red[700],
       ),
-      body: Padding( // MODIFICATION STARTS HERE
-        padding: const EdgeInsets.all(16.0), // Add some padding around the form
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Form(
-          key: _formKey, // Assign the form key
-          child: ListView( // Use ListView to prevent overflow with keyboard
+          key: _formKey,
+          child: ListView(
             children: <Widget>[
-              const SizedBox(height: 20), // Spacer
-
-              // Email TextFormField
+              // ... (other TextFormFields for email, password, name, blood group remain the same) ...
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _emailController,
                 decoration: InputDecoration(
@@ -80,7 +76,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   if (!value.contains('@') || !value.contains('.')) {
                     return 'Please enter a valid email address';
                   }
-                  return null; // Return null if the input is valid
+                  return null;
                 },
               ),
 
@@ -96,9 +92,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.0),
                   ),
-                  // We'll add an icon to show/hide password later
                 ),
-                obscureText: true, // Hides the password text
+                obscureText: true,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter your password';
@@ -106,14 +101,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   if (value.length < 6) {
                     return 'Password must be at least 6 characters long';
                   }
-                  return null; // Return null if the input is valid
+                  return null;
                 },
               ),
-              const SizedBox(height: 20), // Spacer before Name field
+              const SizedBox(height: 20),
 
               // Name TextFormField
               TextFormField(
-                controller: _nameController, // Use the controller defined earlier
+                controller: _nameController,
                 decoration: InputDecoration(
                   labelText: 'Full Name',
                   hintText: 'Enter your full name',
@@ -131,10 +126,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 },
               ),
 
-              const SizedBox(height: 20), // Spacer between Name and Blood Group
-
-              // Blood Group TextFormField
-              // Blood Group DropdownFormField
+              const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 decoration: InputDecoration(
                   labelText: 'Blood Group',
@@ -143,10 +135,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     borderRadius: BorderRadius.circular(8.0),
                   ),
                 ),
-                value: _selectedBloodGroup, // Uses the new state variable
+                value: _selectedBloodGroup,
                 hint: const Text('Select Blood Group'),
                 isExpanded: true,
-                items: _bloodGroups.map((String group) { // Uses the new list of blood groups
+                items: _bloodGroups.map((String group) {
                   return DropdownMenuItem<String>(
                     value: group,
                     child: Text(group),
@@ -164,33 +156,71 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   return null;
                 },
               ),
-              const SizedBox(height: 20), // Spacer (existing or add if needed)
+              const SizedBox(height: 20),
 
+              // --- MODIFIED PHONE NUMBER TextFormField ---
               TextFormField(
-                controller: _phoneController, // Use the controller declared in Step 12.1
+                controller: _phoneController,
                 decoration: InputDecoration(
-                  labelText: 'Phone Number (Optional)',
-                  hintText: 'Enter your phone number',
-                  prefixIcon: Icon(Icons.phone),
+                  labelText: 'Phone Number', // Assuming it's mandatory
+                  hintText: '5X XXX XXXX (e.g., 501234567)', // More specific hint
+                  prefixText: "$_countryCode ",
+                  prefixStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.0),
                   ),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (value) {
-                  // Basic validation: if not empty, check if it looks like a phone number.
-                  // This is a very simple check, consider a more robust one for production.
-                  if (value != null && value.isNotEmpty) {
-                    if (value.length < 7 || !RegExp(r'^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$').hasMatch(value)) {
-                      return 'Please enter a valid phone number';
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(9),
+                ],
+                onChanged: (value) { // <--- ADD onChanged
+                  if (value.isNotEmpty && value.startsWith('0')) {
+                    if (!_showPhoneNumberZeroHint) {
+                      setState(() {
+                        _showPhoneNumberZeroHint = true;
+                      });
+                    }
+                  } else {
+                    if (_showPhoneNumberZeroHint) {
+                      setState(() {
+                        _showPhoneNumberZeroHint = false;
+                      });
                     }
                   }
-                  return null; // Null means no error (phone is optional or valid)
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your phone number';
+                  }
+                  if (value.length != 9) {
+                    return 'Phone number must be 9 digits';
+                  }
+                  if (value.startsWith('0')) {
+                    // This validation message will show if the form is submitted
+                    // while the input starts with '0'.
+                    return 'Do not start with 0 (e.g., $_countryCode 5xxxxxxxx)';
+                  }
+                  return null;
                 },
               ),
+              // --- Conditionally display the hint ---
+              if (_showPhoneNumberZeroHint)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 12.0), // You can adjust padding
+                  child: Text(
+                    'Do not start with 0 (e.g., $_countryCode 5xxxxxxxx)',
+                    style: TextStyle(
+                      color: Colors.red[700], // Example color, adjust as needed
+                      fontSize: 12.0,
+                    ),
+                  ),
+                ),
+              // --- END OF PHONE NUMBER MODIFICATIONS ---
 
-              const SizedBox(height: 30),
-
+              const SizedBox(height: 20), // Adjusted spacing slightly for the new hint
+              // ... (Dropdown for Emirate remains the same) ...
               DropdownButtonFormField<String>(
                 decoration: InputDecoration(
                   labelText: 'Emirate',
@@ -225,8 +255,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red[700], // Button background color
-                  foregroundColor: Colors.white, // Text color
+                  backgroundColor: Colors.red[700],
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
                   textStyle: const TextStyle(
                     fontSize: 18,
@@ -236,115 +266,130 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     borderRadius: BorderRadius.circular(8.0),
                   ),
                 ),
-                onPressed: () async{
+                onPressed: () async {
+                  // --- START OF ORIGINAL onPressed LOGIC ---
                   if (!mounted) return;
+
+                  // Hide hint explicitly when trying to submit, validator handles error display
+                  if (_showPhoneNumberZeroHint) {
+                    setState(() {
+                      _showPhoneNumberZeroHint = false;
+                    });
+                  }
+
                   if (_formKey.currentState!.validate()) {
-                    // Form is valid, proceed with Firebase registration
                     try {
-                      // Clear any previous snackbars and show a loading indicator
                       ScaffoldMessenger.of(context).removeCurrentSnackBar();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Registering User...'),
-                          duration: Duration(seconds: 30), // Keep it visible during the network request
+                          duration: Duration(seconds: 30),
                         ),
                       );
 
-                      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-                        email: _emailController.text.trim(), // Use .trim() to remove leading/trailing whitespace
+                      UserCredential userCredential =
+                      await _auth.createUserWithEmailAndPassword(
+                        email: _emailController.text.trim(),
                         password: _passwordController.text.trim(),
                       );
 
                       if (!mounted) return;
-                      User? newUser = userCredential.user; // Get the new user
+                      User? newUser = userCredential.user;
 
-                      if (newUser != null) { // Ensure user is not null
-                        String phoneNumber = _phoneController.text.trim();
+                      if (newUser != null) {
+                        String enteredDigits = _phoneController.text.trim();
+                        // Validator should have already ensured it's 9 digits and doesn't start with '0'
+                        String fullPhoneNumber = _countryCode + enteredDigits;
 
                         await _firestore.collection('users').doc(newUser.uid).set({
                           'uid': newUser.uid,
                           'name': _nameController.text.trim(),
-                          'email': newUser.email, // Store email for convenience
+                          'email': newUser.email,
                           'bloodGroup': _selectedBloodGroup,
-                          'phoneNumber': phoneNumber.isNotEmpty ? phoneNumber : '', // Store empty string if not provided
+                          'phoneNumber': fullPhoneNumber,
                           'emirate': _selectedEmirate,
-                          'createdAt': Timestamp.now(), // Good practice to store creation time
+                          'createdAt': Timestamp.now(),
                         });
-
-                        print('User data saved to Firestore with phone and emirate for UID: ${newUser.uid}');                        // Handle case where user is null after creation (should be rare)
+                        print(
+                            'User data saved to Firestore. Phone: $fullPhoneNumber');
+                      } else {
                         print('User object was null after creation.');
-                        // You might want to show an error message to the user here
-                        // and potentially prevent further execution or navigation.
                       }
 
-                      // The original print statement for successful registration can now be moved
-                      // or removed if the new print statement 'User data saved to Firestore...' is sufficient.
-                      // For example, you can remove or comment out:
-                      // print('Successfully registered user: ${userCredential.user?.uid}');
-
-                      // If registration is successful, userCredential will not be null
-                      print('Successfully registered user: ${userCredential.user?.uid}');
-                      ScaffoldMessenger.of(context).removeCurrentSnackBar(); // Remove "Registering User..." snackbar
-
-                      // Show success SnackBar BRIEFLY before navigating
+                      ScaffoldMessenger.of(context).removeCurrentSnackBar();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar( // Made it const
+                        const SnackBar(
                           content: Text('Registration Successful! Welcome!'),
-                          duration: Duration(seconds: 2), // Short duration
+                          duration: Duration(seconds: 2),
                         ),
                       );
-                      await Future.delayed(const Duration(seconds: 2)); // Made it const
+                      await Future.delayed(const Duration(seconds: 2));
 
-                      if (!mounted) return; // Check mounted status again before navigation
-
-                      // Navigate to the HomeScreen and remove the RegistrationScreen from the stack
-                      /*Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(builder: (context) => const HomeScreen()), // Made it const
-                      );*/
+                      if (!mounted) return;
                       if (Navigator.canPop(context)) {
                         Navigator.of(context).pop();
                       }
-
-
+                      // If you intend to navigate to HomeScreen after successful registration and pop,
+                      // you might want to pushReplacement to avoid users going back to registration.
+                      // Example:
+                      // Navigator.of(context).pushReplacement(
+                      //   MaterialPageRoute(builder: (context) => const HomeScreen()),
+                      // );
                     } on FirebaseAuthException catch (e) {
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).removeCurrentSnackBar(); // Remove "Registering User..." snackbar
-
+                      ScaffoldMessenger.of(context).removeCurrentSnackBar();
                       String errorMessage;
                       if (e.code == 'weak-password') {
                         errorMessage = 'The password provided is too weak.';
                       } else if (e.code == 'email-already-in-use') {
-                        errorMessage = 'An account already exists for that email.';
+                        errorMessage =
+                        'An account already exists for that email.';
                       } else if (e.code == 'invalid-email') {
                         errorMessage = 'The email address is not valid.';
                       } else {
-                        errorMessage = 'Registration failed. Error: ${e.message}'; // Display Firebase's detailed message
+                        errorMessage =
+                        'Registration failed. Error: ${e.message}';
                       }
-
-                      print('Firebase Auth Exception (${e.code}): ${e.message}');
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                            content: Text(errorMessage), backgroundColor: Colors.redAccent),
+                            content: Text(errorMessage),
+                            backgroundColor: Colors.redAccent),
                       );
                     } catch (e) {
                       if (!mounted) return;
-                      ScaffoldMessenger.of(context).removeCurrentSnackBar(); // Remove "Registering User..." snackbar
-
-                      print('Generic Error during registration: ${e.toString()}');
+                      ScaffoldMessenger.of(context).removeCurrentSnackBar();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text('An unexpected error occurred. Please try again.'),
+                            content: Text(
+                                'An unexpected error occurred. Please try again.'),
                             backgroundColor: Colors.redAccent),
                       );
                     }
+                  } else {
+                    // If validation fails, re-check if the hint needs to be displayed based on current input
+                    final currentPhoneText = _phoneController.text;
+                    if (currentPhoneText.isNotEmpty && currentPhoneText.startsWith('0')) {
+                      if (!_showPhoneNumberZeroHint) {
+                        setState(() {
+                          _showPhoneNumberZeroHint = true;
+                        });
+                      }
+                    } else {
+                      if (_showPhoneNumberZeroHint) {
+                        setState(() {
+                          _showPhoneNumberZeroHint = false;
+                        });
+                      }
+                    }
                   }
+
                 },
                 child: const Text('Register'),
-              ), // <-- Make sure there's a comma here if you plan to add more widgets below
+              ),
             ],
           ),
         ),
-      ), // MODIFICATION ENDS HERE
+      ),
     );
   }
 }

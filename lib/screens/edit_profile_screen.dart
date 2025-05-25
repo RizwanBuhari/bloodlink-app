@@ -1,9 +1,7 @@
-// lib/screens/edit_profile_screen.dart
 import 'package:flutter/material.dart';
-// VVVV ADD THESE IMPORTS VVVV
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// ^^^^ END OF IMPORTS ^^^^
+import 'package:flutter/services.dart'; // <--- ADD THIS IMPORT
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> currentUserData;
@@ -20,8 +18,10 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
-  String? _selectedBloodGroup; // ADDED
-  final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  String? _selectedBloodGroup;
+  final List<String> _bloodGroups = [
+    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'
+  ];
 
   final List<String> _emirates = [
     'Abu Dhabi',
@@ -36,39 +36,44 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _selectedEmirate;
 
   late TextEditingController _phoneNumberController;
+  final String _countryCode = "+971"; // <--- ADD COUNTRY CODE
+  bool _showPhoneNumberZeroHint = false; // <--- ADD THIS STATE VARIABLE
   bool _isLoading = false;
   bool _isDonor = false;
 
-
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  // ^^^^ END OF FIREBASE INSTANCES ^^^^
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.currentUserData['name'] as String? ?? '');
+    _nameController =
+        TextEditingController(text: widget.currentUserData['name'] as String? ?? '');
     _selectedBloodGroup = widget.currentUserData['bloodGroup'] as String?;
-    // This next part is a safety check:
-    // If a blood group was stored, but it's not in our valid list (_bloodGroups),
-    // then we shouldn't try to select it in the dropdown. So, we set it to null.
-    if (_selectedBloodGroup != null && !_bloodGroups.contains(_selectedBloodGroup)) {
+    if (_selectedBloodGroup != null &&
+        !_bloodGroups.contains(_selectedBloodGroup)) {
       _selectedBloodGroup = null;
     }
-    _isDonor = widget.currentUserData['isDonor'] as bool? ?? false; // <<< ADD THIS LINE
-    _phoneNumberController = TextEditingController(text: widget.currentUserData['phoneNumber'] as String? ?? '');
+    _isDonor = widget.currentUserData['isDonor'] as bool? ?? false;
+
+    // Initialize phone number, stripping country code if present
+    String initialPhoneNumber = widget.currentUserData['phoneNumber'] as String? ?? '';
+    if (initialPhoneNumber.startsWith(_countryCode)) {
+      initialPhoneNumber = initialPhoneNumber.substring(_countryCode.length);
+    }
+    _phoneNumberController = TextEditingController(text: initialPhoneNumber);
+
 
     _selectedEmirate = widget.currentUserData['emirate'] as String?;
-    // Safety check: if the saved emirate isn't in our list, clear it
     if (_selectedEmirate != null && !_emirates.contains(_selectedEmirate)) {
       _selectedEmirate = null;
     }
-    // Fallback: If 'emirate' is null or not found, AND 'location' exists,
-    // AND 'location' is one of the valid emirates, then use 'location'.
-    // This helps with migrating users who only had 'location' set to an emirate name.
-    if (_selectedEmirate == null && widget.currentUserData.containsKey('location')) {
-      String? potentialLocationAsEmirate = widget.currentUserData['location'] as String?;
-      if (potentialLocationAsEmirate != null && _emirates.contains(potentialLocationAsEmirate)) {
+    if (_selectedEmirate == null &&
+        widget.currentUserData.containsKey('location')) {
+      String? potentialLocationAsEmirate =
+      widget.currentUserData['location'] as String?;
+      if (potentialLocationAsEmirate != null &&
+          _emirates.contains(potentialLocationAsEmirate)) {
         _selectedEmirate = potentialLocationAsEmirate;
       }
     }
@@ -81,13 +86,27 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-// lib/screens/edit_profile_screen.dart
-// ... (imports, class definition, initState, dispose, build method etc. all remain the same)
-
-  // VVVV MODIFY THIS METHOD VVVV
   Future<void> _saveProfileChanges() async {
+    // --- START: HIDE HINT BEFORE VALIDATION ---
+    if (_showPhoneNumberZeroHint) {
+      setState(() {
+        _showPhoneNumberZeroHint = false;
+      });
+    }
+    // --- END: HIDE HINT BEFORE VALIDATION ---
+
     if (!_formKey.currentState!.validate()) {
-      return; // Validation failed, do not proceed.
+      // --- START: RE-EVALUATE HINT VISIBILITY ON VALIDATION FAILURE ---
+      final currentPhoneText = _phoneNumberController.text.trim();
+      if (currentPhoneText.isNotEmpty && currentPhoneText.startsWith('0')) {
+        if (!_showPhoneNumberZeroHint) {
+          setState(() {
+            _showPhoneNumberZeroHint = true;
+          });
+        }
+      }
+      // --- END: RE-EVALUATE HINT VISIBILITY ON VALIDATION FAILURE ---
+      return;
     }
 
     setState(() {
@@ -99,38 +118,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (currentUser == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No user logged in. Please re-login.')),
+            const SnackBar(
+                content: Text('No user logged in. Please re-login.')),
           );
         }
-        return; // Exit if no user
+        return;
       }
       String uid = currentUser.uid;
 
+      // Validator ensures phone doesn't start with 0 and is 9 digits
+      String enteredDigits = _phoneNumberController.text.trim();
+      String fullPhoneNumber = _countryCode + enteredDigits;
+
+
       Map<String, dynamic> updatedData = {
         'name': _nameController.text.trim(),
-        'bloodGroup': _selectedBloodGroup, // Use the state variable
-        'phoneNumber': _phoneNumberController.text.trim(),
+        'bloodGroup': _selectedBloodGroup,
+        'phoneNumber': fullPhoneNumber, // <--- SAVE FULL PHONE NUMBER
         'emirate': _selectedEmirate,
         'isDonor': _isDonor,
-        // 'email': currentUser.email, // Email is usually part of auth, not directly in this map unless you need it duplicated
-        // 'role': widget.currentUserData['role'], // Keep existing role
-        // Or if you have a field for it: _roleController.text
       };
 
-      // Ensure 'role' and 'email' are preserved if they exist in the original data
-      // and are not meant to be changed by this form.
-      // This is important if your Firestore document has more fields than the form.
       if (widget.currentUserData.containsKey('email')) {
         updatedData['email'] = widget.currentUserData['email'];
       }
       if (widget.currentUserData.containsKey('role')) {
         updatedData['role'] = widget.currentUserData['role'];
       }
-      // Also preserve fcmToken if it exists
       if (widget.currentUserData.containsKey('fcmToken')) {
         updatedData['fcmToken'] = widget.currentUserData['fcmToken'];
       }
-
 
       await _firestore.collection('users').doc(uid).update(updatedData);
 
@@ -138,7 +155,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile updated successfully!')),
         );
-        Navigator.of(context).pop(); // Go back to profile screen
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
@@ -148,14 +165,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
       print('Error updating profile: $e');
     } finally {
-      if (mounted) { // Check if the widget is still in the tree
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
       }
     }
   }
-  // ^^^^ END OF MODIFIED METHOD ^^^^
 
   @override
   Widget build(BuildContext context) {
@@ -171,7 +187,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              // ... TextFormField widgets remain the same ...
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -188,22 +203,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               const SizedBox(height: 16.0),
               DropdownButtonFormField<String>(
-                value: _selectedBloodGroup, // Use the state variable
+                value: _selectedBloodGroup,
                 decoration: const InputDecoration(
                   labelText: 'Blood Group',
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.bloodtype),
                 ),
-                hint: const Text('Select Blood Group'), // Shows when no value is selected
-                isExpanded: true, // Makes the dropdown take the full width
-                items: _bloodGroups.map((String group) { // Populate items from your _bloodGroups list
+                hint: const Text('Select Blood Group'),
+                isExpanded: true,
+                items: _bloodGroups.map((String group) {
                   return DropdownMenuItem<String>(
                     value: group,
                     child: Text(group),
                   );
                 }).toList(),
                 onChanged: (String? newValue) {
-                  setState(() { // Update the state when a new value is selected
+                  setState(() {
                     _selectedBloodGroup = newValue;
                   });
                 },
@@ -214,48 +229,90 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   return null;
                 },
               ),
-              // ^^^^ END OF DropdownButtonFormField FOR BLOOD GROUP ^^^^
-
-              const SizedBox(height: 16.0), // Spacing
-
-              // VVVV ADD SwitchListTile FOR isDonor VVVV
+              const SizedBox(height: 16.0),
               SwitchListTile(
                 title: const Text('Available to Donate?'),
-                subtitle: const Text('Make your profile visible to those seeking donors.'),
-                value: _isDonor, // Bind to the _isDonor state variable
+                subtitle: const Text(
+                    'Make your profile visible to those seeking donors.'),
+                value: _isDonor,
                 onChanged: (bool value) {
-                  setState(() { // Update the state when the switch is toggled
+                  setState(() {
                     _isDonor = value;
                   });
                 },
-                secondary: Icon(_isDonor ? Icons.visibility : Icons.visibility_off), // Optional: change icon based on state
-                activeColor: Theme.of(context).colorScheme.primary, // Optional: for styling
+                secondary:
+                Icon(_isDonor ? Icons.visibility : Icons.visibility_off),
+                activeColor: Theme.of(context).colorScheme.primary,
               ),
-
               const SizedBox(height: 16.0),
 
+              // --- MODIFIED PHONE NUMBER TextFormField ---
               TextFormField(
                 controller: _phoneNumberController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration( // <--- REMOVE const
                   labelText: 'Phone Number',
+                  hintText: '5X XXX XXXX (e.g., 501234567)', // <--- ADD HINT TEXT
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone),
+                  prefixText: "$_countryCode ", // <--- ADD PREFIX TEXT
+                  prefixStyle: TextStyle(color: Colors.black, fontWeight: FontWeight.bold), // <--- ADD PREFIX STYLE
+                  // prefixIcon: Icon(Icons.phone), // Prefix text and icon usually don't go well together, choose one.
+                  // Using prefixText as per previous examples.
                 ),
                 keyboardType: TextInputType.phone,
+                inputFormatters: [ // <--- ADD INPUT FORMATTERS
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(9),
+                ],
+                onChanged: (value) { // <--- ADD onChanged
+                  if (value.isNotEmpty && value.startsWith('0')) {
+                    if (!_showPhoneNumberZeroHint) {
+                      setState(() {
+                        _showPhoneNumberZeroHint = true;
+                      });
+                    }
+                  } else {
+                    if (_showPhoneNumberZeroHint) {
+                      setState(() {
+                        _showPhoneNumberZeroHint = false;
+                      });
+                    }
+                  }
+                },
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
+                  final trimmedValue = value?.trim() ?? '';
+                  if (trimmedValue.isEmpty) {
                     return 'Please enter your phone number';
+                  }
+                  if (trimmedValue.length != 9) {
+                    return 'Phone number must be 9 digits';
+                  }
+                  if (trimmedValue.startsWith('0')) {
+                    return 'Do not start with 0 (e.g., $_countryCode 5xxxxxxxx)';
                   }
                   return null;
                 },
               ),
+              // --- Conditionally display the hint ---
+              if (_showPhoneNumberZeroHint)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+                  child: Text(
+                    'Do not start with 0 (e.g., $_countryCode 5xxxxxxxx)',
+                    style: TextStyle(
+                      color: Colors.red[700],
+                      fontSize: 12.0,
+                    ),
+                  ),
+                ),
+              // --- END OF PHONE NUMBER MODIFICATIONS ---
+
               const SizedBox(height: 16.0),
               DropdownButtonFormField<String>(
                 value: _selectedEmirate,
                 decoration: const InputDecoration(
-                  labelText: 'Emirate', // Changed label
+                  labelText: 'Emirate',
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.public), // Changed icon, e.g., public or map
+                  prefixIcon: Icon(Icons.public),
                 ),
                 hint: const Text('Select Emirate'),
                 isExpanded: true,
@@ -272,12 +329,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please select your Emirate'; // Updated validation message
+                    return 'Please select your Emirate';
                   }
                   return null;
                 },
               ),
-// ^^^^ END OF DropdownButtonFormField ^^^^
               const SizedBox(height: 30.0),
               _isLoading
                   ? const Center(child: CircularProgressIndicator())
@@ -291,15 +347,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   textStyle: const TextStyle(fontSize: 16.0),
                 ),
                 onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    // VVVV CALL THE NEW METHOD VVVV
-                    _saveProfileChanges();
-                    // ^^^^ RATHER THAN JUST SHOWING A SNACKBAR ^^^^
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please correct the errors.')),
-                    );
-                  }
+
+                  _saveProfileChanges();
+
                 },
               ),
             ],
