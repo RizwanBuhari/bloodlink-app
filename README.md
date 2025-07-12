@@ -34,7 +34,7 @@
 
 | Home Page | Edit Profile | Create Request |
 |-----------|--------------|----------------|
-| ![](screenshots/home_page.png) | ![](screenshots/edit_profile.png) | ![](screenshots/create_request.png) |
+| ![](screenshots/home_page.pn) | ![](screenshots/edit_profile.png) | ![](screenshots/create_request.png) |
 
 | Blood Bank Locations |
 |----------------------|
