@@ -44,3 +44,19 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# Keystore files (VERY IMPORTANT - DO NOT COMMIT)
+*.jks
+
+# Properties file that may contain keystore alias and passwords
+# Standard name:
+/android/key.properties
+key.properties
+# If you are using .txt extension for it:
+key.properties.txt
+
+# Google Services JSON (Firebase config - recommended to ignore for public repos)
+# If your repo is private and team needs it, you can comment out the line below.
+android/app/google-services.json
+# For iOS, if you ever add it:
+# ios/Runner/GoogleService-Info.plist
+

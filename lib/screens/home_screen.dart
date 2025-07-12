@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart'; // Already present
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-// Your screen imports
 import 'profile_screen.dart';
 import 'create_request_screen.dart';
-import 'my_requests_screen.dart'; // Corrected path assuming it's in the same 'screens' directory
-import 'all_requests_screen.dart'; // Corrected path
-import 'donor_finder_screen.dart'; // Corrected path
-import 'blood_bank_locations_screen.dart'; // Corrected path
-import 'login_screen.dart'; // Added for forced navigation
+import 'my_requests_screen.dart';
+import 'all_requests_screen.dart';
+import 'donor_finder_screen.dart';
+import 'blood_bank_locations_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,8 +28,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_currentUser != null) {
       _fetchUserName();
     } else {
-      // If no current user on init (e.g., app started fresh and user not logged in),
-      // then we are not loading user name.
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -47,7 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Ensure _isLoading is true when fetching starts, in case _fetchUserName is called again.
     if (mounted && !_isLoading) {
       setState(() {
         _isLoading = true;
@@ -77,14 +71,13 @@ class _HomeScreenState extends State<HomeScreen> {
       print('--- HomeScreen _fetchUserName: Error fetching user name: $e ---');
       if (mounted) {
         setState(() {
-          _userName = null; // Set to null on error
+          _userName = null;
           _isLoading = false;
         });
       }
     }
   }
 
-  // Corrected _logout method
   Future<void> _logout() async {
     print("--- HomeScreen _logout: _logout() CALLED ---");
     try {
@@ -92,14 +85,13 @@ class _HomeScreenState extends State<HomeScreen> {
       await FirebaseAuth.instance.signOut();
       print("--- HomeScreen _logout: FirebaseAuth.instance.signOut() COMPLETED ---");
 
-      // If widget is still mounted, force navigation to LoginScreen
       if (mounted) {
         print(
             "--- HomeScreen _logout: Forcing navigation to LoginScreen after successful sign out ---");
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
               (Route<dynamic> route) =>
-          false, // This predicate removes all routes before LoginScreen
+          false,
         );
       } else {
         print(
@@ -111,25 +103,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error logging out: ${e.toString()}')),
         );
-        // Optional: If you want to navigate to LoginScreen even if there's an error during logout
-        // You could add navigation here if desired for error cases too.
-        // print("--- HomeScreen _logout: Forcing navigation to LoginScreen after ERROR during sign out ---");
-        // Navigator.of(context).pushAndRemoveUntil(
-        //   MaterialPageRoute(builder: (context) => const LoginScreen()),
-        //   (Route<dynamic> route) => false,
-        // );
+
       }
     }
   }
 
   void _navigateToProfile() {
-    if (_currentUser != null) { // Good practice to check if user exists
+    if (_currentUser != null) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const ProfileScreen()),
       );
     } else {
-      // Optionally, handle the case where there's no user (e.g., show a message)
       print("--- HomeScreen _navigateToProfile: Cannot navigate to profile, no current user. ---");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You must be logged in to view the profile.')),
@@ -140,42 +125,53 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     print("--- HomeScreen build method CALLED. isLoading: $_isLoading, userName: $_userName ---");
-    double screenWidth = MediaQuery.of(context).size.width;
-    double buttonWidth = screenWidth * 0.8; // Ensure this is not too wide for smaller screens
 
-    final ButtonStyle commonButtonStyle = ElevatedButton.styleFrom(
-      minimumSize: Size(buttonWidth > 0 ? buttonWidth : 200, 48), // Add a fallback minimum width
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-      foregroundColor: Colors.white, // Text color for buttons (if background is dark)
-      backgroundColor: Colors.red[600], // Example button background color
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.0),
+    final List<_BoxButtonData> buttons = [
+      _BoxButtonData(
+        label: 'Request Blood',
+        color: Colors.red[600]!,
+        icon: Icons.bloodtype,
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateRequestScreen()));
+        },
       ),
-      elevation: 2,
-    );
-
-    // Specific styles for buttons that might have different background colors
-    final ButtonStyle tealButtonStyle = commonButtonStyle.copyWith(
-      backgroundColor: MaterialStateProperty.all<Color?>(Colors.teal),
-    );
-    final ButtonStyle blueAccentButtonStyle = commonButtonStyle.copyWith(
-      backgroundColor: MaterialStateProperty.all<Color?>(Colors.blueAccent),
-    );
-    final ButtonStyle orangeAccentButtonStyle = commonButtonStyle.copyWith(
-      backgroundColor: MaterialStateProperty.all<Color?>(Colors.orangeAccent),
-    );
-    final ButtonStyle defaultButtonStyle = commonButtonStyle.copyWith(
-      backgroundColor: MaterialStateProperty.all<Color?>(Colors.grey[300]),
-      foregroundColor: MaterialStateProperty.all<Color?>(Colors.black), // Text black for light background
-    );
-
+      _BoxButtonData(
+        label: 'Find Donors',
+        color: Colors.green[600]!,
+        icon: Icons.people_alt,
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const DonorFinderScreen()));
+        },
+      ),
+      _BoxButtonData(
+        label: 'My Requests',
+        color: Colors.teal,
+        icon: Icons.list_alt,
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const MyRequestsScreen()));
+        },
+      ),
+      _BoxButtonData(
+        label: 'Active Requests',
+        color: Colors.blueAccent,
+        icon: Icons.view_list,
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const AllRequestsScreen()));
+        },
+      ),
+      _BoxButtonData(
+        label: 'Blood Banks',
+        color: Colors.orangeAccent,
+        icon: Icons.location_on,
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const BloodBankLocationsScreen()));
+        },
+      ),
+    ];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Home'),
-        // backgroundColor is inherited from theme in main.dart if set, or can be overridden here
-        // backgroundColor: Colors.red[700],
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
@@ -184,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: _logout, // Calls the corrected _logout method
+            onPressed: _logout,
             tooltip: 'Logout',
           ),
         ],
@@ -192,95 +188,107 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Center(
         child: _isLoading
             ? const CircularProgressIndicator()
-            : SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 16.0, vertical: 24.0),
+            : Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: <Widget>[
+            children: [
               Text(
                 _userName != null && _userName!.isNotEmpty
                     ? 'Welcome, $_userName!'
                     : 'Welcome!',
                 style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87), // Adjusted text color
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
 
-              // Button 1: Request Blood
-              ElevatedButton(
-                style: defaultButtonStyle,
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) =>
-                        const CreateRequestScreen()),
-                  );
-                },
-                child: const Text('Request Blood'),
+              // Grid of box buttons
+              Expanded(
+                child: GridView.builder(
+                  itemCount: buttons.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2, // 2 columns
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 1.3, // Width / height ratio
+                  ),
+                  itemBuilder: (context, index) {
+                    final btn = buttons[index];
+                    return _BoxButton(
+                      label: btn.label,
+                      color: btn.color,
+                      icon: btn.icon,
+                      onTap: btn.onTap,
+                    );
+                  },
+                ),
               ),
-              const SizedBox(height: 15),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-              // Button 2: Find Available Donors
-              ElevatedButton(
-                style: defaultButtonStyle,
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const DonorFinderScreen()),
-                  );
-                },
-                child: const Text('Find Available Donors'),
-              ),
-              const SizedBox(height: 15),
+class _BoxButtonData {
+  final String label;
+  final Color color;
+  final IconData icon;
+  final VoidCallback onTap;
 
-              // Button 3: My Submitted Requests
-              ElevatedButton(
-                style: tealButtonStyle, // Using specific style
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const MyRequestsScreen()),
-                  );
-                },
-                child: const Text('My Submitted Requests'),
-              ),
-              const SizedBox(height: 15),
+  _BoxButtonData({
+    required this.label,
+    required this.color,
+    required this.icon,
+    required this.onTap,
+  });
+}
 
-              // Button 4: View Active Requests
-              ElevatedButton(
-                style: blueAccentButtonStyle, // Using specific style
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const AllRequestsScreen()),
-                  );
-                },
-                child: const Text('View Active Requests'),
-              ),
-              const SizedBox(height: 15),
+class _BoxButton extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData icon;
+  final VoidCallback onTap;
 
-              // Button 5: Blood Bank Locations
-              ElevatedButton(
-                style: orangeAccentButtonStyle, // Using specific style
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) =>
-                        const BloodBankLocationsScreen()),
-                  );
-                },
-                child: const Text('Blood Bank Locations'),
-              ),
+  const _BoxButton({
+    Key? key,
+    required this.label,
+    required this.color,
+    required this.icon,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 6,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        splashColor: Colors.white24,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 48, color: Colors.white),
+              const SizedBox(height: 12),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  letterSpacing: 0.7,
+                ),
+                textAlign: TextAlign.center,
+              )
             ],
           ),
         ),

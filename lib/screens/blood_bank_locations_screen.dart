@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class BloodBank {
-  final String id; // Document ID from Firestore
+  final String id;
   final String name;
   final String address;
   final String emirate;
